@@ -1,0 +1,14 @@
+Modified Wisper-server module for OpenSim
+Original and client program can be found at http://whisper.vcomm.ch/forum/
+
+Build and install as original
+
+in OpenSim.ini, section [MurmurVoice] add the following parameters:
+
+        murmur_AgentPass = "AShortPassword"
+        murmur_EstateChannel = "EstateVoiceChannel"
+
+murmur_AgentPass is a password for agents, so its identical across your sims (replaces a random component original code used)
+murmur_EstateChannel defines the channel for all parcels without "Restrict voice to this parcel" (in about land -> media) unchecked
+
+this module still needs a lot of work
