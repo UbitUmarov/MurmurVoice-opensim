@@ -113,15 +113,9 @@ namespace MurmurVoice
         }
 
         public override void userDisconnected(User state, Ice.Current current)
-        {
-            try
-            {
-                m_manager.Agent.Get(state.userid).session = -1;
-            } catch (KeyNotFoundException)
-            {
-                m_log.DebugFormat("[MurmurVoice]: Userid {0} not handled by murmur manager", state.userid);
-            }
-        }
+			{
+			m_log.DebugFormat("[MurmurVoice]: userDisconnected {0}",state.userid);
+			}
 
         public override void userStateChanged(User state, Ice.Current current) { }
         public override void channelCreated(Channel state, Ice.Current current) { }
@@ -395,7 +389,28 @@ namespace MurmurVoice
 				
             return agent;
         }
-        
+      
+		public void AgentRemove(UUID uuid,bool unregister)
+			{
+			Agent a;
+			lock(uuid_to_agent)
+				{
+				if(uuid_to_agent.ContainsKey(uuid))			
+					{
+					a=uuid_to_agent[uuid];
+					m_log.InfoFormat("[MurmurVoice] Forget user {0}",a.userid );
+					uuid_to_agent.Remove(uuid);
+					if(unregister)
+						m_server.unregisterUser(a.userid);
+					lock(uuid_to_agent)
+						{
+						if(userid_to_agent.ContainsKey(a.userid))
+							userid_to_agent.Remove(a.userid);
+						}
+					}
+				}
+			}
+			
         public Agent Get(int userid)
         {
             lock(userid_to_agent)
@@ -561,15 +576,32 @@ namespace MurmurVoice
 					ID=m_manager.Channel.AddParent(RegionName);
 					m_RegionParents.Add(RegionName,ID);
 					}
-			
+
+				scene.EventManager.OnNewClient += OnNewClient;
+				
                 scene.EventManager.OnRegisterCaps += delegate(UUID agentID, Caps caps)
 					{
                     OnRegisterCaps(scene, agentID, caps);
 					};				
-
 				}
 			}
-        
+
+       public void OnNewClient(IClientAPI client)
+			{
+			m_log.DebugFormat("[MurmurVoice]: OnNewClient");
+			client.OnConnectionClosed += OnConnectionClose;
+			}
+					
+        public void OnConnectionClose(IClientAPI client)
+			{
+			m_log.DebugFormat("[MurmurVoice]: OnConnectionClose");
+			
+			ScenePresence sp = (client.Scene as Scene).GetScenePresence (client.AgentId);
+			if (sp != null && !sp.IsChildAgent)
+				m_manager.Agent.AgentRemove(client.AgentId,client.IsLoggingOut);
+			}		
+			
+			
         // Called to indicate that all loadable modules have now been added
         public void RegionLoaded(Scene scene)
         {
@@ -581,6 +613,7 @@ namespace MurmurVoice
         {
             if(m_enabled)
             {
+				scene.EventManager.OnNewClient -= OnNewClient;
 				string RegionName  = scene.RegionInfo.RegionName;				
                 m_manager.Channel.RemoveParent(RegionName);
             }
@@ -788,6 +821,5 @@ namespace MurmurVoice
                               avatarName, request, path, param);
             return "<llsd>true</llsd>";
         }
-
     }
 }

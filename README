@@ -14,4 +14,7 @@ murmur_EstateChannel: defines the channel for all parcels without "Restrict voic
 channel_name: this original setting is no longer used. Region parent voice channel is now the region name
 
 this module still needs a lot of work
-warning: user registrations are (for now) not being deleted on murmur server.
+
+TP to sims without this module and TP back work bad because client code doesn't request parcelvoice information on return to same region
+so you may end up talking on the wrong parcel.
+Is a bad ideia to keep users coonected when they TP out to a sim without this module, client should disconnect on this TPs ( or all ?)
