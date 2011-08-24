@@ -8,7 +8,10 @@ in OpenSim.ini, section [MurmurVoice] add the following parameters:
         murmur_AgentPass = "AShortPassword"
         murmur_EstateChannel = "EstateVoiceChannel"
 
-murmur_AgentPass is a password for agents, so its identical across your sims (replaces a random component original code used)
-murmur_EstateChannel defines the channel for all parcels without "Restrict voice to this parcel" (in about land -> media) unchecked
+murmur_AgentPass: is a password for agents, so its identical across your sims (replaces a random component original code used)
+murmur_EstateChannel: defines the channel for all parcels without "Restrict voice to this parcel" (in about land -> media) unchecked
+
+channel_name: this original setting is no longer used. Region parent voice channel is now the region name
 
 this module still needs a lot of work
+warning: user registrarions are (for now) not being deleted on murmur server.

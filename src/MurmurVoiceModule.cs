@@ -145,7 +145,7 @@ namespace MurmurVoice
             get { return m_channel_manager; }
         }
 
-        public ServerManager(ServerPrx server, string channel,string estatechannel)
+        public ServerManager(ServerPrx server, string estatechannel)
         {
             m_server = server;
 
@@ -160,7 +160,7 @@ namespace MurmurVoice
             m_agent_manager = new AgentManager(m_server);
 
             // Create the Channel Manager
-            m_channel_manager = new ChannelManager(m_server, channel,estatechannel);
+            m_channel_manager = new ChannelManager(m_server, estatechannel);
         }
 
         public void Dispose()
@@ -174,89 +174,134 @@ namespace MurmurVoice
         private ServerPrx m_server;
         private static readonly ILog m_log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        int parent_chan;
 		int estate_chan;
 
-        public ChannelManager(ServerPrx server, string channel,string estatechan)
-        {
+        public ChannelManager(ServerPrx server, string estatechan)
+			{
             m_server = server;
 			Murmur.Tree ServerTree;
-			parent_chan = -1;
-            // Update list of channels
+			estate_chan = -1;
+            // check list of channels
 			ServerTree = m_server.getTree();
             lock(chan_ids)
-//                foreach(var child in m_server.getTree().children)
+				{
                 foreach(var child in ServerTree.children)
-					{
-                    chan_ids[child.c.name] = child.c.id;
-					m_log.DebugFormat("[MurmurVoice]: Known base channel {0} id {1}",
-						child.c.name,child.c.id);
-					if(child.c.name == channel)
+					{                   
+					if(child.c.name == estatechan)
 						{
-						parent_chan = chan_ids[child.c.name];
-						foreach(var ch in child.children)
-							{
-							m_log.DebugFormat("[MurmurVoice]: child {0} id {1}",
-							ch.c.name,ch.c.id);
-							chan_ids[ch.c.name] = ch.c.id;
-							}
+						chan_ids[child.c.name] = child.c.id;
+						estate_chan = child.c.id;
+						m_log.DebugFormat("[MurmurVoice]: Estate channel {0} already created id {1}",
+							child.c.name,child.c.id);
+						break;
 						}
 					}
-            // create it if it wasn't found
-			if(parent_chan == -1)
-				{
-                parent_chan = m_server.addChannel(channel, 0);
-				chan_ids[channel]=parent_chan;
-				m_log.InfoFormat("[MurmurVoice]: Region Parent channel created {0} id {1}",channel,parent_chan);
 				}
+            // create it if it wasn't found
+			if(estate_chan == -1)
+				{
+                estate_chan = m_server.addChannel(estatechan, 0);
+				chan_ids[estatechan]=estate_chan;
+				m_log.InfoFormat("[MurmurVoice]: Estate channel {0} created id {1}",estatechan,estate_chan);
 				
             // Set permissions on channels
-            Murmur.ACL[] acls = new Murmur.ACL[1];
-            acls[0] = new Murmur.ACL();
-            acls[0].group = "all";
-            acls[0].applyHere = true;
-            acls[0].applySubs = true;
-            acls[0].inherited = false;
-            acls[0].userid = -1;
-            acls[0].allow = Murmur.PermissionSpeak.value;
-            acls[0].deny = Murmur.PermissionEnter.value;
+				Murmur.ACL[] acls = new Murmur.ACL[1];
+				acls[0] = new Murmur.ACL();
+				acls[0].group = "all";
+				acls[0].applyHere = true;
+				acls[0].applySubs = true;
+				acls[0].inherited = false;
+				acls[0].userid = -1;
+				acls[0].allow = Murmur.PermissionSpeak.value;
+				acls[0].deny = Murmur.PermissionEnter.value;
 
-            m_log.InfoFormat("[MurmurVoice] Setting ACLs on channel. Parent chanel {0}",parent_chan);
-            m_server.setACL(parent_chan, acls, (new List<Murmur.Group>()).ToArray(), true);
-			
-			if(chan_ids.ContainsKey(estatechan))
-				{
-				estate_chan = chan_ids[estatechan];
-				 m_log.InfoFormat("[MurmurVoice]: Estate channel found {0} id {1}",estatechan,estate_chan);
+				m_server.setACL(estate_chan, acls, (new List<Murmur.Group>()).ToArray(), true);		
 				}
-			else			
-				{
-				estate_chan = m_server.addChannel(estatechan, 0);
-				chan_ids[estatechan]=estate_chan;
-				m_log.InfoFormat("[MurmurVoice]: Estate channel created {0} id {1}",estatechan,estate_chan);
-				if(estate_chan != parent_chan)
-					m_server.setACL(estate_chan, acls, (new List<Murmur.Group>()).ToArray(), true);
-				}
-			
-        }
+			}
 
         public void Dispose()
         {
         }
 
-        public int GetOrCreate(string name)
-        {
-            lock(chan_ids) {
+		public int AddParent(string RegionName)
+			{
+			Murmur.Tree ServerTree;
+			int chID = -1;
+			
+            // check list of current channels
+			ServerTree = m_server.getTree();
+            lock(chan_ids)
+				{
+				if(chan_ids.ContainsKey(RegionName))
+					chan_ids.Remove(RegionName);
+					
+                foreach(var child in ServerTree.children)
+					{
+					if(child.c.name == RegionName)
+						{
+						m_log.DebugFormat("[MurmurVoice]: Region parent channel already created:",
+							child.c.name,child.c.id);
+						chan_ids[RegionName] = child.c.id;
+						chID = child.c.id;
+						foreach(var ch in child.children)
+							{
+							m_log.DebugFormat("[MurmurVoice]: Found child {0} id {1}",
+								ch.c.name,ch.c.id);						
+							chan_ids[ch.c.name] = ch.c.id;
+							}
+						break;
+						}
+					}
+				}
+            // create it if it wasn't found
+			if(chID == -1)
+				{
+                chID = m_server.addChannel(RegionName, 0);
+				chan_ids[RegionName] = chID;
+				            // Set permissions on channels
+				Murmur.ACL[] acls = new Murmur.ACL[1];
+				acls[0] = new Murmur.ACL();
+				acls[0].group = "all";
+				acls[0].applyHere = true;
+				acls[0].applySubs = true;
+				acls[0].inherited = false;
+				acls[0].userid = -1;
+				acls[0].allow = Murmur.PermissionSpeak.value;
+				acls[0].deny = Murmur.PermissionEnter.value;
+
+				m_server.setACL(chID, acls, (new List<Murmur.Group>()).ToArray(), true);
+				m_log.InfoFormat("[MurmurVoice]: Region Parent channel created {0} id {1}",RegionName,chID);
+
+				}
+				
+			
+			return chID;
+			}
+		
+        public int GetOrCreate(string name,int parent)
+			{
+            lock(chan_ids)
+				{
                 if (chan_ids.ContainsKey(name))
                     return chan_ids[name];
                 m_log.InfoFormat("[MurmurVoice]: Channel '{0}' not found. Creating.", name);
-                return chan_ids[name] = m_server.addChannel(name, parent_chan);
-            }
-        }
+                return chan_ids[name] = m_server.addChannel(name, parent);
+				}
+			}
 		
-        public void RemoveParent()
+        public void RemoveParent(string RegionName)
 			{
-			m_server.removeChannel(parent_chan);
+			int id;
+			lock(chan_ids)
+				{
+				if(chan_ids.ContainsKey(RegionName))
+					{
+					id=chan_ids[RegionName];
+					m_server.removeChannel(id);
+					chan_ids.Remove(RegionName);
+				
+					}
+				}
 			}
     }
     
@@ -327,7 +372,6 @@ namespace MurmurVoice
 				
 					foreach(var u in m_server.getUsers())
 						{
-						m_log.InfoFormat("[MurmurVoice]: users online {0} new {1}",u.Value.userid,agent.userid);
 						if(u.Value.userid == agent.userid)
 							{
 							agent.session = u.Value.session;
@@ -339,9 +383,7 @@ namespace MurmurVoice
 					return agent;
 					}
 				}
-					
-          
-
+			
             agent.userid = m_server.registerUser(agent.user_info);            
             m_log.InfoFormat("[MurmurVoice]: Registered {0} (uid {1}) identified by {2}", agent.uuid.ToString(), agent.userid, agent.pass);
 
@@ -376,6 +418,9 @@ namespace MurmurVoice
         private static readonly string m_provisionVoiceAccountRequestPath = "0108/";
         private static readonly string m_chatSessionRequestPath = "0109/";
 
+		
+		private static Dictionary<string,int> m_RegionParents = new Dictionary<string,int>();
+		
         // Configuration
         private IConfig m_config;
         private static string m_murmurd_ice;
@@ -387,10 +432,9 @@ namespace MurmurVoice
 
 		public static string m_murmurd_AgentPass;
 		public static string m_murmurd_EstateChannel;
-		public static string m_murmurd_RegionChannel;
 		
         public void Initialise(IConfigSource config)
-        {
+			{
             if(m_started)
                 return;
             m_started = true;
@@ -398,25 +442,24 @@ namespace MurmurVoice
             m_config = config.Configs["MurmurVoice"];
 
             if (null == m_config)
-            {
+				{
                 m_log.Info("[MurmurVoice] no config found, plugin disabled");
                 return;
-            }
+				}
 
             if (!m_config.GetBoolean("enabled", false))
-            {
+				{
                 m_log.Info("[MurmurVoice] plugin disabled by configuration");
                 return;
-            }
+				}
 
             try
-            {
+				{
                 // retrieve configuration variables
                 m_murmurd_ice = m_config.GetString("murmur_ice", String.Empty);
                 m_murmurd_host = m_config.GetString("murmur_host", String.Empty);
 				m_murmurd_AgentPass = m_config.GetString("murmur_AgentPass", String.Empty);
-				m_murmurd_EstateChannel = m_config.GetString("murmur_EstateChannel", String.Empty);
-				m_murmurd_RegionChannel = m_config.GetString("channel_name","Channel");
+				m_murmurd_EstateChannel = m_config.GetString("murmur_EstateChannel", "MyEstate");
 				
                 int server_id = m_config.GetInt("murmur_sid", 1);
                 
@@ -424,15 +467,13 @@ namespace MurmurVoice
                 if (String.IsNullOrEmpty(m_murmurd_ice) ||
                     String.IsNullOrEmpty(m_murmurd_host) ||
 					String.IsNullOrEmpty(m_murmurd_AgentPass)
-					)
-                {
+															)
+					{
                     m_log.Error("[MurmurVoice] plugin disabled: incomplete configuration");
                     return;
-                }
+					}
 
-			    if(String.IsNullOrEmpty(m_murmurd_EstateChannel))
-					m_murmurd_EstateChannel = m_murmurd_RegionChannel;
-				
+			
                 m_murmurd_ice = "Meta:" + m_murmurd_ice;
 
                 Ice.Communicator comm = Ice.Util.initialize();
@@ -441,32 +482,33 @@ namespace MurmurVoice
 
                 Glacier2.RouterPrx router = null;
                 if(glacier_enabled)
-                {
-		    router = RouterPrxHelper.uncheckedCast(comm.stringToProxy(m_config.GetString("glacier_ice", String.Empty)));
-                    comm.setDefaultRouter(router);
+					{
+					router = RouterPrxHelper.uncheckedCast(comm.stringToProxy(m_config.GetString("glacier_ice", String.Empty)));
+						comm.setDefaultRouter(router);
                     router.createSession(m_config.GetString("glacier_user","admin"),m_config.GetString("glacier_pass","password"));
-                }
+					}
 
                 MetaPrx meta = MetaPrxHelper.checkedCast(comm.stringToProxy(m_murmurd_ice));
 
                 // Create the adapter
-		comm.getProperties().setProperty("Ice.PrintAdapterReady", "0");
+				comm.getProperties().setProperty("Ice.PrintAdapterReady", "0");
                 Ice.ObjectAdapter adapter;
                 if(glacier_enabled)
-                {
+					{
                     adapter = comm.createObjectAdapterWithRouter("Callback.Client", comm.getDefaultRouter() );
-                } else
-                {
+					}
+				else
+					{
                     adapter = comm.createObjectAdapterWithEndpoints("Callback.Client", m_config.GetString("murmur_ice_cb","tcp -h 127.0.0.1"));
-                }
+					}
                 adapter.activate();
 
                 // Create identity and callback for Metaserver
-		Ice.Identity metaCallbackIdent = new Ice.Identity();
-		metaCallbackIdent.name = "metaCallback";
+				Ice.Identity metaCallbackIdent = new Ice.Identity();
+				metaCallbackIdent.name = "metaCallback";
                 if(router != null)
-		    metaCallbackIdent.category = router.getCategoryForClient();
-		MetaCallbackPrx meta_callback = MetaCallbackPrxHelper.checkedCast(adapter.add(new MetaCallbackImpl(), metaCallbackIdent ));
+					metaCallbackIdent.category = router.getCategoryForClient();
+				MetaCallbackPrx meta_callback = MetaCallbackPrxHelper.checkedCast(adapter.add(new MetaCallbackImpl(), metaCallbackIdent ));
                 meta.addCallback(meta_callback);
 
                 m_log.InfoFormat("[MurmurVoice] using murmur server ice '{0}'", m_murmurd_ice);
@@ -483,7 +525,7 @@ namespace MurmurVoice
                     m_murmurd_port = Convert.ToInt32(defaults["port"])+server_id-1;
 
                 // starts the server and gets a callback
-                m_manager = new ServerManager(server, m_murmurd_RegionChannel,m_murmurd_EstateChannel);
+                m_manager = new ServerManager(server, m_murmurd_EstateChannel);
 
                 // Create identity and callback for this current server
                 m_callback = new ServerCallbackImpl(server, m_manager);
@@ -496,25 +538,37 @@ namespace MurmurVoice
                 // Show information on console for debugging purposes
                 m_log.InfoFormat("[MurmurVoice] using murmur server '{0}:{1}', sid '{2}'", m_murmurd_host, m_murmurd_port, server_id);
                 m_log.Info("[MurmurVoice] plugin enabled");
-		m_enabled = true;
-            }
+				m_enabled = true;
+				}
             catch (Exception e)
-            {
+				{
                 m_log.ErrorFormat("[MurmurVoice] plugin initialization failed: {0}", e.ToString());
                 return;
-            }
-        }
+				}
+			}
 
         public void AddRegion(Scene scene)
-        {
+			{	
             if(m_enabled)
-            {
+				{
+				string RegionName  = scene.RegionInfo.RegionName;
+				int ID;
+
+				m_log.DebugFormat("[MurmurVoice]: Adding Region {0}", RegionName);
+			
+				lock(m_RegionParents)
+					{
+					ID=m_manager.Channel.AddParent(RegionName);
+					m_RegionParents.Add(RegionName,ID);
+					}
+			
                 scene.EventManager.OnRegisterCaps += delegate(UUID agentID, Caps caps)
-                {
+					{
                     OnRegisterCaps(scene, agentID, caps);
-                };
-            }
-        }
+					};				
+
+				}
+			}
         
         // Called to indicate that all loadable modules have now been added
         public void RegionLoaded(Scene scene)
@@ -527,7 +581,9 @@ namespace MurmurVoice
         {
             if(m_enabled)
             {
-                m_manager.Channel.RemoveParent();
+				string RegionName  = scene.RegionInfo.RegionName;
+				
+                m_manager.Channel.RemoveParent(RegionName);
                 m_manager.Dispose();
             }
         }
@@ -687,13 +743,22 @@ namespace MurmurVoice
                 if ( ((land.Flags & (uint)ParcelFlags.AllowVoiceChat) > 0) && scene.RegionInfo.EstateSettings.AllowVoice )
                 {
                     Agent agent = m_manager.Agent.GetOrCreate(agentID);
-                    agent.channel = m_manager.Channel.GetOrCreate(ChannelName(scene, land));
+					
+					string RegionName  = scene.RegionInfo.RegionName;
+					if(m_RegionParents.ContainsKey(RegionName))
+						{				
+						int RParent = m_RegionParents[RegionName];
+					
+						agent.channel = m_manager.Channel.GetOrCreate(ChannelName(scene, land),RParent);
 
                     // Host/port pair for voice server
-                    channel_uri = String.Format("{0}:{1}", m_murmurd_host, m_murmurd_port);
+						channel_uri = String.Format("{0}:{1}", m_murmurd_host, m_murmurd_port);
 
-                    m_log.InfoFormat("[MurmurVoice]: {0}", channel_uri);
-                    m_callback.AddUserToChan(agent);
+						m_log.InfoFormat("[MurmurVoice]: {0}", channel_uri);
+						m_callback.AddUserToChan(agent);
+						}
+					else
+						m_log.DebugFormat("[MurmurVoice]: Region Parent channel not found: {0}",RegionName);
                 } else {
                     m_log.DebugFormat("[MurmurVoice]: Voice not enabled.");
                 }
