@@ -14,4 +14,4 @@ murmur_EstateChannel: defines the channel for all parcels without "Restrict voic
 channel_name: this original setting is no longer used. Region parent voice channel is now the region name
 
 this module still needs a lot of work
-warning: user registrarions are (for now) not being deleted on murmur server.
+warning: user registrations are (for now) not being deleted on murmur server.
