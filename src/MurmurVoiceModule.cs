@@ -581,10 +581,8 @@ namespace MurmurVoice
         {
             if(m_enabled)
             {
-				string RegionName  = scene.RegionInfo.RegionName;
-				
+				string RegionName  = scene.RegionInfo.RegionName;				
                 m_manager.Channel.RemoveParent(RegionName);
-                m_manager.Dispose();
             }
         }
 
@@ -595,7 +593,7 @@ namespace MurmurVoice
 
         public void Close()
         {
-            // Do nothing.
+                m_manager.Dispose();
         }
 
         public Type ReplaceableInterface 
