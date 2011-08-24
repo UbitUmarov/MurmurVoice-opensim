@@ -597,8 +597,8 @@ namespace MurmurVoice
 			m_log.DebugFormat("[MurmurVoice]: OnConnectionClose");
 			
 			ScenePresence sp = (client.Scene as Scene).GetScenePresence (client.AgentId);
-			if (sp != null && !sp.IsChildAgent)
-				m_manager.Agent.AgentRemove(client.AgentId,client.IsLoggingOut);
+			bool unreg =  sp != null && !sp.IsChildAgent && client.IsLoggingOut;
+			m_manager.Agent.AgentRemove(client.AgentId, unreg);
 			}		
 			
 			
