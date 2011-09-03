@@ -440,6 +440,7 @@ namespace MurmurVoice
         private IConfig m_config;
         private static string m_murmurd_ice;
         private static string m_murmurd_host;
+        private static string m_murmurd_exthost;
         private static int m_murmurd_port;
         private static ServerManager m_manager;
         private static bool m_started;
@@ -473,11 +474,13 @@ namespace MurmurVoice
                 // retrieve configuration variables
                 m_murmurd_ice = m_config.GetString("murmur_ice", String.Empty);
                 m_murmurd_host = m_config.GetString("murmur_host", String.Empty);
+                m_murmurd_exthost = m_config.GetString("murmur_exthost", String.Empty);
 				m_murmurd_AgentPass = m_config.GetString("murmur_AgentPass", String.Empty);
 				m_murmurd_EstateChannel = m_config.GetString("murmur_EstateChannel", "MyEstate");
 				
                 int server_id = m_config.GetInt("murmur_sid", 1);
                 
+				
                 // Admin interface required values
                 if (String.IsNullOrEmpty(m_murmurd_ice) ||
                     String.IsNullOrEmpty(m_murmurd_host) ||
@@ -488,6 +491,8 @@ namespace MurmurVoice
                     return;
 					}
 
+				if (String.IsNullOrEmpty(m_murmurd_exthost))
+					m_murmurd_exthost = m_murmurd_host;
 			
                 m_murmurd_ice = "Meta:" + m_murmurd_ice;
 
@@ -551,7 +556,7 @@ namespace MurmurVoice
                 server.addCallback(ServerCallbackPrxHelper.checkedCast(adapter.add(m_callback, serverCallbackIdent)));
 
                 // Show information on console for debugging purposes
-                m_log.InfoFormat("[MurmurVoice] using murmur server '{0}:{1}', sid '{2}'", m_murmurd_host, m_murmurd_port, server_id);
+                m_log.InfoFormat("[MurmurVoice] using murmur server '{0}:{1}', sid '{2}' extern host {3}", m_murmurd_host, m_murmurd_port, server_id,m_murmurd_exthost);
                 m_log.Info("[MurmurVoice] plugin enabled");
 				m_enabled = true;
 				}
@@ -594,7 +599,7 @@ namespace MurmurVoice
 					
         public void OnConnectionClose(IClientAPI client)
 			{
-			m_log.DebugFormat("[MurmurVoice]: OnConnectionClose");
+			m_log.DebugFormat("[MurmurVoice]: OnConnectionClose {0}",client.AgentId);
 			
 			ScenePresence sp = (client.Scene as Scene).GetScenePresence (client.AgentId);
 			bool unreg =  sp != null && !sp.IsChildAgent && client.IsLoggingOut;
@@ -733,8 +738,8 @@ namespace MurmurVoice
                 Agent agent = m_manager.Agent.GetOrCreate(agentID);
 
                 LLSDVoiceAccountResponse voiceAccountResponse =
-                    new LLSDVoiceAccountResponse(agent.web, agent.pass, m_murmurd_host, 
-                        String.Format("tcp://{0}:{1}", m_murmurd_host, m_murmurd_port)
+                    new LLSDVoiceAccountResponse(agent.web, agent.pass, m_murmurd_exthost, 
+                        String.Format("tcp://{0}:{1}", m_murmurd_exthost, m_murmurd_port)
                 );
                 
                 string r = LLSDHelpers.SerialiseLLSDReply(voiceAccountResponse);
@@ -783,7 +788,7 @@ namespace MurmurVoice
 						agent.channel = m_manager.Channel.GetOrCreate(ChannelName(scene, land),RParent);
 
                     // Host/port pair for voice server
-						channel_uri = String.Format("{0}:{1}", m_murmurd_host, m_murmurd_port);
+						channel_uri = String.Format("{0}:{1}", m_murmurd_exthost, m_murmurd_port);
 
 						m_log.InfoFormat("[MurmurVoice]: {0}", channel_uri);
 						m_callback.AddUserToChan(agent);
